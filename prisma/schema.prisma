@@ -1,8 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
+/**
+ * 你的使用者模型
+ * - 保留你原本用的 username、password（bcrypt 後存）
+ * - email 唯一
+ */
+model User {
+  id            String    @id @default(uuid())
+  username      String
+  email         String    @unique
+  password      String
+  createdAt     DateTime  @default(now())
+
+  // NextAuth 關聯
+  accounts      Account[]
+  sessions      Session[]
+}
+
+/**
+ * NextAuth OAuth/憑證帳號記錄
+ * 即使暫時只用 Credentials，保留這張表以後可拓展 Google/GitHub。
+ */
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+/** NextAuth Session（重點：用來存使用者登入狀態） */
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/** 用於 Email 登入/重置密碼驗證等（保留以備後用） */
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
